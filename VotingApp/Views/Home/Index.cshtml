@@ -1,0 +1,142 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Voting</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #87CEFA;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+       .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        li span {
+            font-size: 18px;
+            color: #555;
+        }
+
+        li button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        li button:hover {
+            background-color: #0056b3;
+        }
+
+        li button.unvote {
+            background-color: #dc3545;
+        }
+
+        li button.unvote:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Online Voting</h1>
+        <ul id="votesList">
+            @foreach (var vote in Model)
+            {
+                <li>
+                    <span>@vote.Option: @vote.Count</span>
+                    <button onclick="vote('@vote.Option')">Vote</button>
+                    <button class="unvote" onclick="unvote('@vote.Option')">Unvote</button>
+                </li>
+            }
+        </ul>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.8/signalr.min.js"></script>
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+           .withUrl("/votehub")
+           .build();
+
+        connection.on("ReceiveVote", function (option) {
+            const votesList = document.getElementById("votesList");
+            const items = votesList.getElementsByTagName("li");
+            for (let i = 0; i < items.length; i++) {
+                const span = items[i].getElementsByTagName("span")[0];
+                if (span.textContent.includes(option)) {
+                    const count = parseInt(span.textContent.split(":")[1].trim());
+                    span.textContent = `${option}: ${count + 1}`;
+                }
+            }
+        });
+
+        connection.on("ReceiveUnvote", function (option) {
+            const votesList = document.getElementById("votesList");
+            const items = votesList.getElementsByTagName("li");
+            for (let i = 0; i < items.length; i++) {
+                const span = items[i].getElementsByTagName("span")[0];
+                if (span.textContent.includes(option)) {
+                    const count = parseInt(span.textContent.split(":")[1].trim());
+                    span.textContent = `${option}: ${count - 1}`;
+                }
+            }
+        });
+
+        async function vote(option) {
+            await connection.invoke("Vote", option);
+        }
+
+        async function unvote(option) {
+            const votesList = document.getElementById("votesList");
+            const items = votesList.getElementsByTagName("li");
+            for (let i = 0; i < items.length; i++) {
+                const span = items[i].getElementsByTagName("span")[0];
+                if (span.textContent.includes(option)) {
+                    const count = parseInt(span.textContent.split(":")[1].trim());
+                    if (count > 0) {
+                        await connection.invoke("Unvote", option);
+                    } else {
+                        alert("Нельзя снять голос, так как голосов нет.");
+                    }
+                }
+            }
+        }
+
+        connection.start().catch(err => console.error(err.toString()));
+    </script>
+</body>
+</html>
